@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { jwtDecode, JwtPayload } from "jwt-decode";
+
+interface JWTPayload extends JwtPayload {
+  role: string;
+}
 
 interface RouteGroup {
   routes: string[];
@@ -20,9 +25,21 @@ roleMap.set("navygator", {
 });
 
 export default async function middleware(req: NextRequest) {
+  // The middleware first takes the JWT token from the HTTP cookie,
+  // then decodes it and extracts the contents of it to determine permissions
+
   const path = req.nextUrl.pathname;
 
-  const role = (await cookies()).get("role")?.value ?? "guest";
+  const cookieStore = await cookies();
+
+  let role: string;
+  if (cookieStore.has("jwt")) {
+    const jwtString = cookieStore.get("jwt")?.value!;
+    const jwt = jwtDecode<JWTPayload>(jwtString);
+    role = jwt.role;
+  } else {
+    role = "guest";
+  }
 
   if (roleMap.get(role)?.routes.includes(path)) {
     return NextResponse.next();
